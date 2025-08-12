@@ -6,7 +6,6 @@ from rclpy.qos import QoSProfile
 import can
 import threading
 import time
-#import rospy
 import struct
 import signal 
 import sys
