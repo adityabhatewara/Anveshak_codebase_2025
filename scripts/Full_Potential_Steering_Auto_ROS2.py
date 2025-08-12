@@ -4,10 +4,10 @@ import rclpy as r
 from rclpy.node import Node
 import copy
 from sensor_msgs.msg import Joy
-from std_msgs.msg import Int8, Int32MultiArray, MultiArrayLayout, MultiArrayDimension, Float32MultiArray, Bool
+from std_msgs.msg import Int8, Int32MultiArray, MultiArrayLayout, MultiArrayDimension, Float32MultiArray
 import queue
 from operator import add
-from traversal.msg import WheelRpm
+from traversal2.msg import WheelRpm 
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from time import time
 
@@ -17,22 +17,22 @@ class Drive(Node):
         super().__init__("drive_node")
 
         self.max_steer_pwm = 127              
-        self.init_dir = [1] * 8               # Dont know what this is 
-        self.state = False                    # Decides which mode rover is in: True -> Autonomous & False -> Manual
+        self.init_dir = [1] * 8                # Dont know what this is 
+        self.state = False                     # Decides which mode rover is in: True -> Autonomous & False -> Manual
 
-        self.mode_up_button = 7               # Buttons that cycle through the modes
-        self.mode_down_button = 6             # 0 -> 1 -> 2 -> 3 (up)
+        self.mode_up_button = 7                # Buttons that cycle through the modes
+        self.mode_down_button = 6              # 0 -> 1 -> 2 -> 3 (up)
 
-        self.fb_axis = 1                      # To move rover forward-back
-        self.lr_axis = 2                      # To move rover left-right
-        self.forward_btn = 4                  # To turn all wheels parallel to chassis
-        self.parallel_btn = 1                 # To turn all wheels perpendicular to chassis
+        self.fb_axis = 1                       # To move rover forward-back
+        self.lr_axis = 2                       # To move rover left-right
+        self.forward_btn = 4                   # To turn all wheels parallel to chassis
+        self.parallel_btn = 1                  # To turn all wheels perpendicular to chassis
         self.rotinplace_btn = 3                         
-        self.autonomous_btn = 0               # Autonomous button switches between manual and autonomous
+        self.autonomous_btn = 0                # Autonomous button switches between manual and autonomous
 
-        self.steer_islocked = True            # Checks if the steering has been unlocked
-        self.steering_ctrl_unlocked = [0,0]   # Will store the buttons which control when the steering is unlocked
-        self.steering_ctrl_pwm = [0,0]        # Will store the axis input when the steering is unlocked
+        self.steer_islocked = True             # Checks if the steering has been unlocked
+        self.steering_ctrl_unlocked = [0, 0]   # Will store the buttons which control when the steering is unlocked
+        self.steering_ctrl_pwm = [0, 0]        # Will store the axis input when the steering is unlocked
 
         self.full_potential_islocked = True   # Checks if full potential steering is unlocked
         self.full_potential_pwm = [0, 0]      # Will store the axis input for each of the wheels when full potential is unlocked
@@ -107,6 +107,7 @@ class Drive(Node):
 
         if not self.state:   # The rover is in manual mode  
             
+            # This is the correct version, just want to see if I can do some jugaad
             if joy.buttons[self.mode_up_button]:
                 if self.mode < 4:
                     self.mode += 1
@@ -114,6 +115,9 @@ class Drive(Node):
             if joy.buttons[self.mode_down_button]:
                 if self.mode > 0:
                     self.mode -= 1
+
+            # self.mode += joy.buttons[self.mode_up_button] * (self.mode < 4)
+            # self.mode -= joy.buttons[self.mode_down_button] * (self.mode > 0)
 
             match (self.steer_islocked, self.full_potential_islocked):
                 case (True, True):
@@ -126,12 +130,15 @@ class Drive(Node):
                         joy.buttons[self.parallel_btn],
                         joy.buttons[self.rotinplace_btn]
                     ]
+                    
                     # This variable is to get the fb and lr axes input from the controller
                     self.drive_ctrl = [joy.axes[self.fb_axis], -joy.axes[self.lr_axis]]
                     # There is a fourth axis apparently and this variable stores it
                     self.curve_opp_str = joy.axes[3] 
 
                 case (False, True):
+                    # In this case steering is unlocked 
+
                     # self.steering_ctrl_unlocked stores the buttons which are unlocked when steering is unlocked
                     self.steering_ctrl_unlocked = [
                         joy.buttons[self.forward_btn],
@@ -144,6 +151,8 @@ class Drive(Node):
                     ]
 
                 case (True, False):
+                    # In this full potential steering is unlocked
+
                     # self.full_potential_steering holds inputs for all the four wheels, when we want to achieve full potential steering
                     self.full_potential_pwm = [
                         joy.axes[self.fl_wheel_axis],
@@ -173,7 +182,7 @@ class Drive(Node):
         self.get_logger().info(len(data))
  
         self.enc_data[0] = data[1]   # Front Left
-        self.enc_data[1] = - data[4] # Front Right
+        self.enc_data[1] = -data[4]  # Front Right
         self.enc_data[2] = data[0]   # Back Left
         self.enc_data[3] = data[5]   # Back Right
 
@@ -215,7 +224,6 @@ class Drive(Node):
                         self.state_init[0] = False
                         self.steering_ctrl_locked[0] = 1
                         self.state_init[1] = True
-            ## ------------------------- ##            
 
                     
     def steer(self, initial_angles, final_angles, mode):
@@ -289,52 +297,80 @@ class Drive(Node):
                 # In this case, only changing the wheels orientation is done
 
                 # If the forward button is pressed -> Align all the wheels forward
-                if self.steering_ctrl_locked[0] == 1:
+                # if self.steering_ctrl_locked[0] == 1:
+                #     # Visualisation
+                #     print()
+                #     print("Rotating steering forward")
+                #     print()
+
+                #     self.steering_complete = False
+                #     self.rotinplace = False
+                #     self.start_time = time()
+                #     self.steer([0,0,0,0],[0,0,0,0],1)
+
+                # # Parallel button is pressed -> Align all the wheels perpendicular to the rover
+                # elif self.steering_ctrl_locked[1] == 1:
+                #     # Visualisation
+                #     print()
+                #     print("Rotating steering perpendicular to rover")
+                #     print()
+
+                #     self.steering_complete = False
+                #     self.rotinplace = False
+                #     self.start_time = time()
+                #     self.steer([0,0,0,0],[90,90,90,90],1)
+
+                # # Rotin button is pressed -> Align wheels for rotating in place
+                # elif(self.steering_ctrl_locked[2] == 1):
+                #     # Visualisation
+                #     print()
+                #     print("Rotating steering for in place rotation")
+                #     print()
+                #     # rotinplace must be made true only in manual mode
+                #     # Then why isnt there a condition that takes self.autonomous_btn into account?
+                #     self.rotinplace = True
+                #     self.steering_complete = False
+                #     self.start_time = time()
+                #     self.steer([0,0,0,0],[55,-55,-55,55],1)
+
+                if 1 in self.steering_ctrl_locked:
                     # Visualisation
+                    index = self.steering_ctrl_locked.index(1)
+                    visualisation_string_dict = {
+                        0: "Rotating steering forward",
+                        1: "Rotating steering perpendicular to rover",
+                        2: "Rotating steering for in place rotation"
+                    }
+
                     print()
-                    print("Rotating steering forward")
+                    print(visualisation_string_dict[index])
                     print()
 
                     self.steering_complete = False
-                    self.rotinplace = False
+                    self.rotinplace = (self.steering_ctrl_locked[2] == 1)
                     self.start_time = time()
-                    self.steer([0,0,0,0],[0,0,0,0],1)
-
-                # Parallel button is pressed -> Align all the wheels perpendicular to the rover
-                elif self.steering_ctrl_locked[1] == 1:
-                    # Visualisation
-                    print()
-                    print("Rotating steering perpendicular to rover")
-                    print()
-
-                    self.steering_complete = False
-                    self.rotinplace = False
-                    self.start_time = time()
-                    self.steer([0,0,0,0],[90,90,90,90],1)
-
-                # Rotin button is pressed -> Align wheels for rotating in place
-                elif(self.steering_ctrl_locked[2] == 1):
-                    # Visualisation
-                    print()
-                    print("Rotating steering for in place rotation")
-                    print()
-                    # rotinplace must be made true only in manual mode
-                    # Then why isnt there a condition that takes self.autonomous_btn into account?
-                    self.rotinplace = True
-                    self.steering_complete = False
-                    self.start_time = time()
-                    self.steer([0,0,0,0],[55,-55,-55,55],1)
-
-                # self.curve_opp_str basically gives a curve motion so all the wheels kind of align in order to achieve that
+                    
+                    final_angles_dict = {
+                        0: [0, 0, 0, 0],
+                        1: [90, 90, 90, 90],
+                        2: [55, -55, -55, 55]
+                    }
+                    final_angles = final_angles_dict[index]
+                    self.steer(initial_angles=[0, 0, 0, 0], final_angles=final_angles, mode=1)
+               
                 elif (abs(self.curve_opp_str) > 0.2):
+                    # self.curve_opp_str basically gives a curve motion so all the 
+                    # wheels kind of align in order to achieve that
                     self.steering_complete = False
                     self.rotinplace = False
                     self.start_time = time()
 
                     # Amount of curve needed multiplied with steering multiplier
                     temp = int(self.s_arr[self.mode] * self.curve_opp_str)
+
                     # PWM message
-                    self.pwm_msg.data = [  # Last four values of this message encode the omega for each wheel
+                    self.pwm_msg.data = [  
+                        # Last four values of this message encode the omega for each wheel
                         0,0,0,0,
                         temp * self.init_dir[4],  
                         temp * self.init_dir[5], 
@@ -357,29 +393,46 @@ class Drive(Node):
                 # Make a deep copy
                 enc_data_new = copy.deepcopy(self.enc_data)
                 
-                # Forward button is pressed -> Turn all wheels 45 deg from their current state in clockwise direction
-                if (self.steering_ctrl_unlocked[0] == 1):
-                    # Visualisation
+                # # Forward button is pressed -> Turn all wheels 45 deg from their current state in clockwise direction
+                # if (self.steering_ctrl_unlocked[0] == 1):
+                #     # Visualisation
+                #     print()
+                #     print("Turning steering clockwise by 45 deg")
+                #     print()
+
+                #     self.steering_complete = False
+                #     self.rotinplace = False
+                #     self.start_time = time()
+                #     self.steer(enc_data_new, [45,45,45,45], 0) # Initial angle, final angle, mode=0 for relative
+
+                # # Parallel button pressed -> Turn all wheels by 45 deg anticlockwise
+                # elif (self.steering_ctrl_unlocked[1] == 1):
+                #     # Visualisation
+                #     print()
+                #     print("Turning steering anti-clockwise by 45 deg")
+                #     print()
+
+                #     self.steering_complete = False
+                #     self.rotinplace = False
+                #     self.start_time = time()
+                #     self.steer(enc_data_new, [-45,-45,-45,-45], 0) # initial angle, final angle, mode=0 for relative
+                if 1 in self.steering_ctrl_unlocked:
+                    index = self.steering_ctrl_unlocked.index(1)
+
+                    visualisation_string_dict = {
+                        0: "clockwise",
+                        1: "anti-clockwise"
+                    }
+                    # Visualization
                     print()
-                    print("Turning steering clockwise by 45 deg")
+                    print(f"Turning steering {visualisation_string_dict[index]} by 45 deg")
                     print()
 
+                    final_angles = [45 if index == 0 else -45] * 4
                     self.steering_complete = False
                     self.rotinplace = False
                     self.start_time = time()
-                    self.steer(enc_data_new, [45,45,45,45], 0) # Initial angle, final angle, mode=0 for relative
-
-                # Parallel button pressed -> Turn all wheels by 45 deg anticlockwise
-                elif (self.steering_ctrl_unlocked[1] == 1):
-                    # Visualisation
-                    print()
-                    print("Turning steering anti-clockwise by 45 deg")
-                    print()
-
-                    self.steering_complete = False
-                    self.rotinplace = False
-                    self.start_time = time()
-                    self.steer(enc_data_new, [-45,-45,-45,-45], 0) # initial angle, final angle, mode=0 for relative
+                    self.steer(initial_angles=enc_data_new, final_angles=final_angles, mode=0)
 
                 # If same dir axis is toggled
                 elif (self.steering_ctrl_pwm[0] != 0 and abs(self.steering_ctrl_pwm[1]) < 0.2):     # Edit here to give operator threshold
@@ -504,7 +557,9 @@ class Drive(Node):
                     -int(vel) * self.init_dir[3], 
                     0,0,0,0]
                 
-                if (self.print_ctrl == 0):    # Printing only at certain intervals, to prevent the screen from being filed with data   #print_ctrl is being incremented in main() every time
+                if self.print_ctrl == 0:    
+                    # Printing only at certain intervals, to prevent the screen from being filled with data   
+                    # Print_ctrl is being incremented in main() every time
                     print("Rotation speed =", int(vel))
                     
  
@@ -558,7 +613,6 @@ class Drive(Node):
     
 
     def timer_callback(self):
-        
         self.get_logger().info(self.steering_ctrl_locked)
 
         if self.rotin != 0:
