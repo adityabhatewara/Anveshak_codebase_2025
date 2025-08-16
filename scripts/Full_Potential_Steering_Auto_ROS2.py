@@ -235,7 +235,7 @@ class Drive(Node):
 
         # Encoder is relative
         relative_angle_conditions = [
-            abs(self.enc_data[i] - initial_angles[i]) < abs(final_angles[i] - self.error_thresh) 
+            abs(self.enc_data[i] - initial_angles[i]) < abs(final_angles[i]) - self.error_thresh 
             for i in range(4)
         ]
 
