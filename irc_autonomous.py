@@ -13,7 +13,6 @@ from traversal.msg import WheelRpm
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from traversal.srv import *
 from std_msgs.msg import Bool
-import pyrealsense2 as rs
 import threading
 import std_msgs.msg as std_msgs
 from sensor_msgs.msg import Image
@@ -21,21 +20,15 @@ from sensor_msgs.msg import Imu
 from sensor_msgs.msg import NavSatFix
 from ultralytics import YOLO
 from cv_bridge import CvBridge
-import numpy as np
 import pyrealsense2 as rs
 from ultralytics.utils.plotting import Annotator
 from collections import defaultdict
-
-
 import statistics
-import numpy as np
 import cv2 as cv
 import open3d as o3d
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
 import csv
 
-#================This is the standard code for rot in place===========================
+# ======================This is the standard code for rot in place======================== #
 
 model = YOLO("/home/nvidia/caesar2020/src/juniors_autonomous/best_cube.pt") 
 cone_model = YOLO("/home/nvidia/caesar2020/src/juniors_autonomous/Cone.pt")
@@ -66,7 +59,7 @@ class ZedDepth(Node):
         #self.template_l = cv.resize(self.template_l, (60, 40), cv.INTER_AREA)
         self.templatel = cv.GaussianBlur(cv.imread('arrow_template_left.jpg', cv.IMREAD_GRAYSCALE),(5,5),3)
         self.templater = cv.GaussianBlur(cv.imread('arrow_template_right.jpg',cv.IMREAD_GRAYSCALE),(5,5),3)
-        #self.h, self.w = self.template_r.shape
+        # self.h, self.w = self.template_r.shape
         self.z_angle = self.x_angle = self.y_angle = 0
         self.turn = False
         self.circle_dist = 1.5
@@ -125,18 +118,23 @@ class ZedDepth(Node):
         self.base_rot_dir=1
         
         try:
-            self.create_subscription(Bool, 'state', self.state_callback, self.qos)
-            print("1")
-            rclpy.Subscriber(Imu, '/zed2i/zed_node/imu/data', self.yaw_callback, self.qos)
-            print("2")
-            rclpy.Subscriber(std_msgs.Float32MultiArray, "enc_arm", self.enc_callback, self.qos)
-            print("3")
-            rclpy.Subscriber(NavSatFix, "/gps_coordinates", self.gps_callback, self.qos)
-            print("4")
-            rclpy.Subscriber(Image, "/zed2i/zed_node/rgb/image_rect_color", self.color_callback, self.qos)
-            print("color")
-            rclpy.Subscriber(Image, "/zed2i/zed_node/depth/depth_registered", self.depth_callback, self.qos)
-            print("depth")
+            self.create_subscription(Bool, 'state', self.state_callback, qos_profile)
+            self.get_logger().info("1")
+
+            self.create_subscription(Imu, '/zed2i/zed_node/imu/data', self.yaw_callback, qos_profile)
+            self.get_logger().info("2")
+
+            self.create_subscription(Float32MultiArray, 'enc_arm', self.enc_callback, qos_profile)
+            self.get_logger().info("3")
+
+            self.create_subscription(NavSatFix, '/gps_coordinates', self.gps_callback, qos_profile)
+            self.get_logger().info("4")
+
+            self.create_subscription(Image, '/zed2i/zed_node/rgb/image_rect_color', self.color_callback, qos_profile)
+            self.get_logger().info("color")
+
+            self.create_subscription(Image, '/zed2i/zed_node/depth/depth_registered', self.depth_callback, qos_profile)
+            self.get_logger().info("depth")
         except KeyboardInterrupt:
             # quit
             sys.exit()
@@ -535,12 +533,7 @@ class ZedDepth(Node):
                     else:
                     	self.v1_competition()
                 	    #rclpy.sleep(10)
-	                    #self.write_coordinates()
-
-                    
-                    
-                        
-                   
+	                    #self.write_coordinates()         
         else:
             print("Forward")
             msg.vel = 50
@@ -548,20 +541,20 @@ class ZedDepth(Node):
             self.turn = False
 
 
-    def v1_competition(self):
-        msg_stop=WheelRpm()
-        msg_stop.hb=False
-        msg_stop.vel=msg_stop.omega=0
-        wheelrpm_pub.publish(msg_stop)
-        print("Course completed(hopefully)")
-        while rclpy.ok():
-            if(self.state==True):
-                print("Press 'A' to go to joystick mode.")
-                rate.sleep()
+        def v1_competition(self): ### changes in algo need to be maade as this uses functions like sleep etc. ###
+            msg_stop=WheelRpm()
+            msg_stop.hb=False
+            msg_stop.vel=msg_stop.omega=0
+            wheelrpm_pub.publish(msg_stop)
+            print("Course completed(hopefully)")
+            while rclpy.ok():
+                if(self.state==True):
+                    print("Press 'A' to go to joystick mode.")
+                    rate.sleep()
 
-            else:
-                print("Rover in Joystick mode")
-                rate.sleep()
+                else:
+                    print("Rover in Joystick mode")
+                    rate.sleep()
 
     def process_dict(self):
         print("self.searchcalled (should print true always):", self.searchcalled)
@@ -735,7 +728,7 @@ class ZedDepth(Node):
             self.direction = "Not Available"
             #rospy.sleep(2)
 
-    def search(self):
+    def search(self): ### changes need to be made as function is using functions like sleep and rate etc. ###
         print("==========================================================================================================SEARCH START=====================================================================================")
         if time.time() - self.start_time < self.time_thresh:  # time_thresh is 20s
             print(
@@ -807,7 +800,7 @@ class ZedDepth(Node):
             msg.data[self.base_index]=-255*self.base_rot_dir
             rate.sleep()
             self.pub.publish(msg)
-            print("deistance from search:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX ",self.distance)
+            print("distance from search:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX ",self.distance)
             # main area
         elif (
             self.init == True
@@ -1021,4 +1014,3 @@ if __name__ == '__main__':
         pass
     finally:
         cv.destroyAllWindows()
-
