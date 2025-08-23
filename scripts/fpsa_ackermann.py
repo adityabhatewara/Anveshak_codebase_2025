@@ -296,42 +296,43 @@ class Drive(Node):
         print()
 
     def ackermann_steering(self):
-                self.start_time = time() #IDK if this is needed tbh, better to visualise the published values ig
+        self.start_time = time() #IDK if this is needed tbh, better to visualise the published values ig
+        self.get_logger().info(("*" * 15) + "\n\nACKERMANN STEERING\n\n" + ("*" * 15))
+        # Amount of curve needed multiplied with steering multiplier
+        # temp = int(self.s_arr[self.mode] * self.curve_opp_str)
+        # Different cases for autonomous and manual
+        if self.state:
+            ack_pwm=self.autonomous_omega 
+        else:
+            ack_pwm=self.drive_ctrl[1]
+        #If the pwm angular velocity is too low, it should not steer
+        if abs(ack_pwm)<0.1:
+            delta_left=0.0
+            delta_right=0.0
+        else:
+            # Desired steering angle based on normalized input
+            delta = math.radians(self.max_steer_angle) * ack_pwm
 
-                    # Amount of curve needed multiplied with steering multiplier
-                #temp = int(self.s_arr[self.mode] * self.curve_opp_str)
-                #Different cases for autonomous and manual
-                if self.state:
-                    ack_pwm=self.autonomous_omega 
-                else:
-                    ack_pwm=self.drive_ctrl[1]
-                #If the pwm angular velocity is too low, it should not steer
-                if abs(ack_pwm)<0.1:
-                    delta_left=0.0
-                    delta_right=0.0
-                else:
-                    # Desired steering angle based on normalized input
-                    delta = math.radians(self.max_steer_angle) * ack_pwm
+            # Turning radius
+            R = self.wheelbase / math.tan(delta)
 
-                    # Turning radius
-                    R = self.wheelbase / math.tan(delta)
+            # Ackermann angles for left and right wheels in the front axle
+            delta_left  = math.atan(self.wheelbase / (R - self.track/2))
+            delta_right = math.atan(self.wheelbase / (R + self.track/2))
 
-                    # Ackermann angles for left and right wheels in the front axle
-                    delta_left  = math.atan(self.wheelbase / (R - self.track/2))
-                    delta_right = math.atan(self.wheelbase / (R + self.track/2))
+            # Convert back to degrees
+            delta_left = math.degrees(delta_left)
+            delta_right = math.degrees(delta_right)
 
-                    # Convert back to degrees
-                    delta_left = math.degrees(delta_left)
-                    delta_right = math.degrees(delta_right)
+        #Preparing steer function arguments
+        ackermann_angles=[delta_left, delta_right, 0, 0]
 
-                #Preparing steer function arguments
-                ackermann_angles=[delta_left, delta_right, 0, 0]
-
-                self.steer(initial_angles=self.enc_data, final_angles=ackermann_angles, mode=1)
+        self.steer(initial_angles=self.enc_data, final_angles=ackermann_angles, mode=1)
 
         # At the end, steering is complete
-                self.steering_complete = True
-                self.start_time = time()
+        self.steering_complete = True
+        self.start_time = time()
+
     def steering(self):
         match (self.steer_islocked, self.full_potential_islocked):
             case (True, True):
