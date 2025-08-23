@@ -97,7 +97,7 @@ class Drive(Node):
         self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
         self.pwm_msg.layout.dim[0].label = 'write'
 
-        self.qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
+        self.qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
 
         self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, self.qos)
         self.enc_sub = self.create_subscription(Float32MultiArray, "/enc_auto", self.enc_callback, self.qos)
