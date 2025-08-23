@@ -9,7 +9,7 @@ import queue
 from operator import add
 from traversal2.msg import WheelRpm 
 from rclpy.qos import QoSProfile, ReliabilityPolicy
-from time import time
+from time import time, sleep
 
 class Drive(Node):
 
@@ -35,7 +35,7 @@ class Drive(Node):
         self.steering_ctrl_pwm = [0, 0]        # Will store the axis input when the steering is unlocked
 
         self.full_potential_islocked = True   # Checks if full potential steering is unlocked
-        self.full_potential_pwm = [0, 0]      # Will store the axis input for each of the wheels when full potential is unlocked
+        self.full_potential_pwm = [0, 0, 0, 0]      # Will store the axis input for each of the wheels when full potential is unlocked
 
         self.steer_unlock_axis = 4            # The joy axis that locks full potential when the steering is being toggled
         self.steer_samedir_axis = 2           # Tells which axis will be used for samedir motion
@@ -111,10 +111,12 @@ class Drive(Node):
             if joy.buttons[self.mode_up_button]:
                 if self.mode < 4:
                     self.mode += 1
+                    sleep(1)
 
             if joy.buttons[self.mode_down_button]:
                 if self.mode > 0:
                     self.mode -= 1
+                    sleep(1)
 
             # self.mode += joy.buttons[self.mode_up_button] * (self.mode < 4)
             # self.mode -= joy.buttons[self.mode_down_button] * (self.mode > 0)
@@ -610,6 +612,7 @@ class Drive(Node):
             self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
             self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
             self.pwm_msg.layout.dim[0].label = 'write'
+            self.pwm_pub.publish(self.pwm_msg)
     
 
     def timer_callback(self):
