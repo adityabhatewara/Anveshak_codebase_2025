@@ -59,8 +59,8 @@ class Drive(Node):
 
         #Ackermann Steering Parameters
         self.ackermann_axes = 6
-        self.wheel_base = 1
-        self.track = 0.5
+        self.wheel_base = 0.73
+        self.track = 0.58
         self.max_steer_angle = 45
 
         # Print parameters
@@ -298,7 +298,6 @@ class Drive(Node):
 
     def ackermann_steering(self):
         self.start_time = time() #IDK if this is needed tbh, better to visualise the published values ig
-        self.get_logger().info(("*" * 15) + "\n\nACKERMANN STEERING\n\n" + ("*" * 15))
         # Amount of curve needed multiplied with steering multiplier
         # temp = int(self.s_arr[self.mode] * self.curve_opp_str)
         # Different cases for autonomous and manual
@@ -461,6 +460,7 @@ class Drive(Node):
                 #     self.start_time = time()
                 #     self.steer(enc_data_new, [-45,-45,-45,-45], 0) # initial angle, final angle, mode=0 for relative
                 if self.ackermann_axes == -1.0:
+                    self.get_logger().info(("*" * 15) + "\n\nACKERMANN STEERING\n\n" + ("*" * 15))
                     self.ackermann_steering()
                 
                 elif 1 in self.steering_ctrl_unlocked:
