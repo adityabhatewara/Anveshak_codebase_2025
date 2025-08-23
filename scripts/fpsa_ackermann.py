@@ -58,9 +58,10 @@ class Drive(Node):
         self.pwm_msg.data = [0, 0, 0, 0, 0, 0, 0, 0]
 
         #Ackermann Steering Parameters
-        self.wheel_base=1
-        self.track=0.5
-        self.max_steer_angle=45
+        self.ackermann_axes = 6
+        self.wheel_base = 1
+        self.track = 0.5
+        self.max_steer_angle = 45
 
         # Print parameters
         self.prints_per_iter = 3
@@ -330,7 +331,7 @@ class Drive(Node):
         self.steer(initial_angles=self.enc_data, final_angles=ackermann_angles, mode=1)
 
         # At the end, steering is complete
-        self.steering_complete = True
+        # self.steering_complete = True
         self.start_time = time()
 
     def steering(self):
@@ -459,7 +460,10 @@ class Drive(Node):
                 #     self.rotinplace = False
                 #     self.start_time = time()
                 #     self.steer(enc_data_new, [-45,-45,-45,-45], 0) # initial angle, final angle, mode=0 for relative
-                if 1 in self.steering_ctrl_unlocked:
+                if self.ackermann_axes == -1.0:
+                    self.ackermann_steering()
+                
+                elif 1 in self.steering_ctrl_unlocked:
                     index = self.steering_ctrl_unlocked.index(1)
 
                     visualisation_string_dict = {
@@ -665,8 +669,8 @@ class Drive(Node):
             self.get_logger().info(f"auto omega is {self.autonomous_omega}")
 
         self.autonomous_control()
-        # self.steering()
-        self.ackermann_steering()
+        self.steering()
+        # self.ackermann_steering()
         self.drive()
         self.pwm_pub.publish(self.pwm_msg)
         self.print_ctrl = (self.print_ctrl + 1) % self.prints_per_iter
