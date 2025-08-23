@@ -327,7 +327,7 @@ class Drive(Node):
                 #Preparing steer function arguments
                 ackermann_angles=[delta_left, delta_right, 0, 0]
 
-                self.steer(initial_angles=[0,0,0,0], final_angles=ackermann_angles, mode=1)
+                self.steer(initial_angles=self.enc_data, final_angles=ackermann_angles, mode=1)
 
         # At the end, steering is complete
                 self.steering_complete = True
