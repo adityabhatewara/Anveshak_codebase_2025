@@ -249,7 +249,7 @@ class Drive(Node):
 
         angle_conditions = [relative_angle_conditions, absolute_angle_conditions]
 
-        while any(angle_conditions[mode]) and (within_time := (time() - self.start_time)):
+        while any(angle_conditions[mode]) and (within_time := (time() - self.start_time)) < self.time_thresh:
 
             # Printing only at certain intervals, to prevent the screen from being filed with data
             if(int(within_time) * 10 % 2 == 0):  
