@@ -84,11 +84,11 @@ class Drive(Node):
 
         # PWM message initialisation
         self.pwm_msg = Int32MultiArray()
-        self.pwm_msg.layout = MultiArrayLayout()
-        self.pwm_msg.layout.data_offset = 0
-        self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
-        self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
-        self.pwm_msg.layout.dim[0].label = 'write'
+        # self.pwm_msg.layout = MultiArrayLayout()
+        # self.pwm_msg.layout.data_offset = 0
+        # self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
+        # self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
+        # self.pwm_msg.layout.dim[0].label = 'write'
 
         self.qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
 
@@ -607,11 +607,11 @@ class Drive(Node):
                 
 
             # PWM message initialisation
-            self.pwm_msg.layout = MultiArrayLayout()
-            self.pwm_msg.layout.data_offset = 0
-            self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
-            self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
-            self.pwm_msg.layout.dim[0].label = 'write'
+            # self.pwm_msg.layout = MultiArrayLayout()
+            # self.pwm_msg.layout.data_offset = 0
+            # self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
+            # self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
+            # self.pwm_msg.layout.dim[0].label = 'write'
             self.pwm_pub.publish(self.pwm_msg)
     
 
