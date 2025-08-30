@@ -616,7 +616,7 @@ class Drive(Node):
     
 
     def timer_callback(self):
-        self.get_logger().info(self.steering_ctrl_locked)
+        self.get_logger().info(f"{self.steering_ctrl_locked}")
 
         if self.rotin != 0:
             self.get_logger().warn(f"{self.rotin}")
