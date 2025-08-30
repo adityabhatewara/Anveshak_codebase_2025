@@ -191,7 +191,7 @@ class Drive(Node):
 
     def rotinplace_callback(self, msg: Int8):
         self.rotin = msg.data
-        self.get_logger().info(self.rotin)
+        self.get_logger().info(f"{self.rotin}")
 
 
     def autonomous_callback(self, rpm: WheelRpm):
