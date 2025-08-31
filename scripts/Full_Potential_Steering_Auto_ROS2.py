@@ -56,7 +56,7 @@ class Drive(Node):
         self.mode = 0                         # Goes from 0 to 4
 
         # Print parameters
-        self.prints_per_iter = 3
+        self.prints_per_iter = 1
         self.print_ctrl = self.prints_per_iter
 
         # Autonomous parameters
@@ -84,11 +84,11 @@ class Drive(Node):
 
         # PWM message initialisation
         self.pwm_msg = Int32MultiArray()
-        # self.pwm_msg.layout = MultiArrayLayout()
-        # self.pwm_msg.layout.data_offset = 0
-        # self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
-        # self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
-        # self.pwm_msg.layout.dim[0].label = 'write'
+        self.pwm_msg.layout = MultiArrayLayout()
+        self.pwm_msg.layout.data_offset = 0
+        self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
+        self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
+        self.pwm_msg.layout.dim[0].label = 'write'
 
         self.qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
 
@@ -108,15 +108,15 @@ class Drive(Node):
         if not self.state:   # The rover is in manual mode  
             
             # This is the correct version, just want to see if I can do some jugaad
-            if joy.buttons[self.mode_up_button]:
+            if joy.buttons[self.mode_up_button]==1:
+                sleep(1)
                 if self.mode < 4:
                     self.mode += 1
-                    sleep(1)
 
-            if joy.buttons[self.mode_down_button]:
+            if joy.buttons[self.mode_down_button]==1:
+                sleep(1)
                 if self.mode > 0:
                     self.mode -= 1
-                    sleep(1)
 
             # self.mode += joy.buttons[self.mode_up_button] * (self.mode < 4)
             # self.mode -= joy.buttons[self.mode_down_button] * (self.mode > 0)
@@ -191,7 +191,7 @@ class Drive(Node):
 
     def rotinplace_callback(self, msg: Int8):
         self.rotin = msg.data
-        self.get_logger().info(f"{self.rotin}")
+        self.get_logger().info(self.rotin)
 
 
     def autonomous_callback(self, rpm: WheelRpm):
@@ -205,7 +205,7 @@ class Drive(Node):
         # Check first if the rover is in autonomous mode
         if self.state:
             # Just check when to print
-            if not self.print_ctrl:
+            if self.print_ctrl==0:
                 self.get_logger().warn("Rover in autonomous mode. Press A to enter manual mode.")
 
             ## Wonder what this part does ##
@@ -249,21 +249,26 @@ class Drive(Node):
 
         angle_conditions = [relative_angle_conditions, absolute_angle_conditions]
 
-        while any(angle_conditions[mode]) and (within_time := (time() - self.start_time)) < self.time_thresh:
+        while any(angle_conditions[mode]) and (within_time := (time() - self.start_time)):
 
             # Printing only at certain intervals, to prevent the screen from being filed with data
             if(int(within_time) * 10 % 2 == 0):  
                 print("Enc_data:- ", self.enc_data, end = "     ")
                 print("Final angles:- ", list(map(add, initial_angles, final_angles)))
         
+            '''
+            pwm = [0,0,0,0]
+            pwm_temp=[0,0,0,0]'''
             # Temporarily stores PWM stuff
+            '''
             pwm_temp = [
                 int(self.kp_steer * (final_angles[i] - ((self.enc_data[i] - initial_angles[i]) if mode == 0 else self.enc_data[i]))) 
                 if angle_conditions[mode][i] else 0
                 for i in range(4)
-            ]
+            ]'''
 
             # Finally constraining the PWM
+            '''
             pwm = [
                     min(self.max_steer_pwm, pwm_temp[i]) 
                     if pwm_temp[i] >= 0 and angle_conditions[mode][i] else
@@ -271,7 +276,17 @@ class Drive(Node):
                     if pwm_temp[i] < 0 and angle_conditions[mode][i] else
                     0 
                     for i in range(4) 
-                ]
+                ]'''
+                
+            for i in range(4):
+                if (abs(self.enc_data[i]-final_angles[i])>self.error_thresh):
+                    pwm_temp[i] = int(self.kp_steer*(final_angles[i]-self.enc_data[i]))
+                    if pwm_temp[i]>=0:
+                        pwm[i]=min(self.max_steer_pwm, pwm_temp[i])
+                    else:
+                        pwm[i] = max(-self.max_steer_pwm, pwm_temp[i])
+                else:
+                    pwm[i] = 0
             
             # PWM message
             self.pwm_msg.data = [
@@ -607,12 +622,14 @@ class Drive(Node):
                 
 
             # PWM message initialisation
-            # self.pwm_msg.layout = MultiArrayLayout()
-            # self.pwm_msg.layout.data_offset = 0
-            # self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
-            # self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
-            # self.pwm_msg.layout.dim[0].label = 'write'
+            self.pwm_msg.layout = MultiArrayLayout()
+            self.pwm_msg.layout.data_offset = 0
+            self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
+            self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
+            self.pwm_msg.layout.dim[0].label = 'write'
             self.pwm_pub.publish(self.pwm_msg)
+        else:
+            pass
     
 
     def timer_callback(self):
@@ -628,6 +645,7 @@ class Drive(Node):
         self.autonomous_control()
         self.steering()
         self.drive()
+        self.pwm_pub.publish(self.pwm_msg)
         self.print_ctrl = (self.print_ctrl + 1) % self.prints_per_iter
 
 
