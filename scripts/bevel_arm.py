@@ -38,7 +38,7 @@ class ArmDriveNode(Node):
         self.get_logger().info(f"Outbuff: {self.outbuff}")
 
         msg = Int32MultiArray()
-        msg.data = buff[:]
+        msg.data = sel.outbuff[:]
         self.pub.publish(msg)
         # self.send_msg(self.outbuff)
 
