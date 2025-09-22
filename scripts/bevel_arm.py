@@ -2,7 +2,7 @@
 
 import rclpy as r
 from rclpy.node import Node
-from std_msgs.msg import Int32MultiArray, MultiArrayDimension, MultiArrayLayout
+from std_msgs.msg import Int32MultiArray
 from sensor_msgs.msg import Joy
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
@@ -14,9 +14,6 @@ class ArmDriveNode(Node):
         self.qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.joy_sub = self.create_subscription(Joy, "/joy_arm", self.joy_callback, self.qos)
         self.pub = self.create_publisher(Int32MultiArray, "/stm_write", self.qos)
-
-        self.outbuff = [0] * 6
-
 
     def joy_callback(self, joy: Joy):
         outbuff = [0] * 6
@@ -34,13 +31,11 @@ class ArmDriveNode(Node):
         outbuff[4] = -axes[2]                  # Gripper
         outbuff[5] = buttons[1] - buttons[0]
 
-        self.outbuff = outbuff
-        self.get_logger().info(f"Outbuff: {self.outbuff}")
+        self.get_logger().info(f"Outbuff: {outbuff}")
 
         msg = Int32MultiArray()
-        msg.data = sel.outbuff[:]
+        msg.data = outbuff[:]
         self.pub.publish(msg)
-        # self.send_msg(self.outbuff)
 
 def main(args=None):
     r.init(args=args)
