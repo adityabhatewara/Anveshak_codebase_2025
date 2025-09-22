@@ -9,7 +9,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 class ArmDriveNode(Node):
 
     def __init__(self):
-        super().__init__("arm_drive")
+        super().__init__("bevel_arm_node")
 
         self.qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
         self.joy_sub = self.create_subscription(Joy, "/joy_arm", self.joy_callback, self.qos)
