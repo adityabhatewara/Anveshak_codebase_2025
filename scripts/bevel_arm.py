@@ -37,24 +37,10 @@ class ArmDriveNode(Node):
         self.outbuff = outbuff
         self.get_logger().info(f"Outbuff: {self.outbuff}")
 
-        self.send_msg(self.outbuff)
-
-
-    def send_msg(self, buff):
         msg = Int32MultiArray()
         msg.data = buff[:]
-
-        msg.layout = MultiArrayLayout()
-        msg.layout.data_offset = 0
-
-        dim = MultiArrayDimension()
-        dim.label = "write"
-        dim.size = dim.stride = len(msg.data)   
-        
-        msg.layout.dim = [dim]
-
         self.pub.publish(msg)
-    
+        # self.send_msg(self.outbuff)
 
 def main(args=None):
     r.init(args=args)
