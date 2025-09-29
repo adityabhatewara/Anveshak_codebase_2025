@@ -1,35 +1,33 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32
 from rclpy.qos import QoSProfile
-
 import can
 import threading
 import time
-#import rospy
+import struct
 import signal 
 import sys
-# from sensor_msgs.msg import Joy
-from std_msgs.msg import Int8, Float32, Int32MultiArray
-from std_msgs.msg import Int32MultiArray, MultiArrayLayout, MultiArrayDimension, Float32MultiArray
+from std_msgs.msg import Int8, Float32, Int32MultiArray, Int32MultiArray, Float32MultiArray
+# from std_msgs.msg import MultiArrayLayout, MultiArrayDimension
 
 class CAN_Class(Node):
     def __init__(self):
-        
-        super().__init__("can")
+        self.get_logger().info("Calling super() init method")
+        super().__init__("can_node")
 
-        self.subscriber_1 = self.create_subscription(Int32MultiArray, "/motor_pwm", self.joyCallback, 10)        
-        self.subscriber_2 = self.create_subscription(Int8, "/test_can", self.int8callback, 10)
-        
-        self.pub_1 = self.create_publisher(Float32, "/final_message", QoSProfile(depth=10))
+        self.get_logger().info("Creating subscribers")
+        self.motor_pwm_sub = self.create_subscription(Int32MultiArray, "/motor_pwm", self.joyCallback, 10)        
+        self.test_can_sub = self.create_subscription(Int8, "/test_can", self.int8callback, 10)
+
+        self.final_message_pub = self.create_publisher(Float32, "/final_message", QoSProfile(depth=10))
         self.enc_pub = self.create_publisher(Float32MultiArray, "/enc_auto", QoSProfile(depth=10))
 
         self.enc_msg = Float32MultiArray()
-        self.enc_msg.layout = MultiArrayLayout()
-        self.enc_msg.layout.data_offset = 0
-        self.enc_msg.layout.dim = [ MultiArrayDimension() ]
-        self.enc_msg.layout.dim[0].size = self.enc_msg.layout.dim[0].stride = len(self.enc_msg.data)
-        self.enc_msg.layout.dim[0].label = 'write'
+        # self.enc_msg.layout = MultiArrayLayout()
+        # self.enc_msg.layout.data_offset = 0
+        # self.enc_msg.layout.dim = [ MultiArrayDimension() ]
+        # self.enc_msg.layout.dim[0].size = self.enc_msg.layout.dim[0].stride = len(self.enc_msg.data)
+        # self.enc_msg.layout.dim[0].label = 'write'
 
         self.msg = can.Message(
             arbitration_id=0x0B1,
@@ -38,18 +36,20 @@ class CAN_Class(Node):
             data= [1,2,3,4,5,6,0]
         )
 
-        self.decoded_encoder_value = 0
+        self.decoded_encoder_value = 0.0
+        ###Third motor's count decreases as it rotates clockwise, that's why the enc_factor is -ve
         self.enc_factor = [90/268,90/268,-90/268,90/268]	
         self.all_msgs = []
         self.bus = can.ThreadSafeBus(channel='can0', bustype='socketcan', fd=True)
-        
+	###Lock doesn't allow other threads to access a shared resource at the same time
         self.data_lock = threading.Lock()
-
+	###Event tells the send_messages thread when there's new data ready to be sent.	
         self.event = threading.Event()
         receiver_thread = threading.Thread(target=self.receive_messages, args=())
+        ###deamon makes the thread a one which runs in the background without interrupting the program
         receiver_thread.daemon = True
         receiver_thread.start()
-        
+
         self.get_logger().info("I am about to send")
         self.total_start_time = time.time()
         sender_thread = threading.Thread(target=self.send_messages, args=())
@@ -61,17 +61,27 @@ class CAN_Class(Node):
         publisher_thread = threading.Thread(target=self.publish_messages, args=())
         publisher_thread.daemon = True
         publisher_thread.start()
-        self.enc_data=[0,0,0,0,0,0]
+        self.enc_data=[0.0,0.0,0.0,0.0,0.0,0.0]
 
+        ### BMS Part
+        self.bms_can_msg_ids = [0x37, 0x38, 0x39]
+        self.bms_pub = self.create_publisher(Float32MultiArray, '/bms/battery_values', QoSProfile(depth=10))
+        self.cell_voltages = [0.0]*12
+        self.get_logger().info("Created BMS Publisher")
+        self.received_bms = set()
+        self.bms_debug=False
     
     def int8callback(self, msg: Int8):
         self.get_logger().info("In Callback")
         #self.data_lock.acquire()
         #if(self.data_lock.locked() == True):
+        ###Acquiring the threading lock, so the other callback doesn't use the can message at the same time
         with self.data_lock:
             self.msg.arbitration_id = 0x0B1
             self.msg.data = bytearray([msg.data])
+            ###Setting the data length to 1 byte
             self.msg.dlc = 1
+            ###Says it's ready to be sent
             self.event.set()
             #self.data_lock.release()
 
@@ -81,17 +91,18 @@ class CAN_Class(Node):
         #if(self.data_lock.locked() == False):
             with self.data_lock:
                 self.msg.arbitration_id = 0x001
+                ###Multiplies the joystick input value by a direction factor,divides the result by 2 and offsets it to ensure the finalvalue is within the allowed 0–255 range
                 self.msg.data =  bytearray([(self.drive_dir[i] * msg.data[i]) // 2 + 127 for i in range(min(8, len(msg.data)))])
                 self.msg.dlc = len(self.msg.data)
                 self.event.set()
-            #    self.data_lock.release()
+            # self.data_lock.release()
             
             
     def publish_messages(self):
         while True:
            try:
                #self.get_logger().info("----------------------------------------------")
-               self.pub_1.publish(Float32(data=self.decoded_encoder_value))
+               self.final_message_pub.publish(Float32(data=self.decoded_encoder_value))
                #self.get_logger().info(f"I published the message {self.decoded_encoder_value}")
                time.sleep(0.1)
            except KeyboardInterrupt:
@@ -103,22 +114,59 @@ class CAN_Class(Node):
         while True:
             try:
                 msg = self.bus.recv()
+                self.get_logger().info(f"Found id: {msg.arbitration_id}")
+                self.get_logger().warn(f"msg={msg}")
                 data = msg.data
                 # Steering motor part
                     #self.enc_msg.data=[0,0,0,0]
+                
+                ### BMS Part
+                if msg.arbitration_id in self.bms_can_msg_ids:
+                    try:
+                    	###Getting index values as 0,1,2,3
+                        frame_index = msg.arbitration_id - 0x37
+                        ###One can message contains values of 4 cells
+                        base = frame_index*4
+                        
+                        for j in range(4):
+                            ###Extracts two bytes data for current cell voltage	
+                            raw_bytes = msg.data[j*2:j*2+2]
+                            ###Converts the hexadecimal number, whose format is different to decimal number( Eg. b'\x10\x27' is raw bytes (0x2710) and scaled will be 10000)
+                            scaled, = struct.unpack('<H', raw_bytes)
+                            voltage = scaled / 10000.0
+                            self.cell_voltages[base+j] = voltage
 
-                self.decoded_encoder_value = int.from_bytes(data[0:2],"little", signed=True)
-                index = msg.arbitration_id - 0x1b
-                self.enc_data[index] = int(self.enc_factor[index] * self.decoded_encoder_value)
-                self.enc_msg.data = self.enc_data
-            
-                #self.decoded_encoder_value = int.from_bytes(data[0:1],"big", signed=True) 
-                self.all_msgs.append(self.decoded_encoder_value)
-                self.get_logger().info(f"Message Received = {self.decoded_encoder_value}")
-                if msg:
-                    self.get_logger().info(f"Received message: {msg}")
-                    self.get_logger().info(f"Recieved value is {self.decoded_encoder_value}")
-                    self.enc_pub.publish(self.enc_msg)
+                        self.received_bms.add(frame_index)
+                        if len(self.received_bms) == 3:
+                            arr_msg = Float32MultiArray()
+                            arr_msg.data = self.cell_voltages
+                            self.bms_pub.publish(arr_msg)
+
+                            self.get_logger().info("BMS Data published")
+                            self.received_bms.clear()
+
+                    except Exception as e:
+                        self.get_logger().error(f"BMS: Error processing message: {e}")                    
+                    
+                    continue
+                
+                ###For encoder values (The index values are dipswitch values of sterring motor drivers)
+                if index in [0x1b, 0x1c, 0x1d, 0x1e]:
+                    ###Extracts the first two bytes of data and decodes them as a signed integer using little-endian format.
+                    self.decoded_encoder_value = int.from_bytes(data[0:2],"little", signed=True)
+                    ###Getting index values as 0,1,2,3
+                    index = msg.arbitration_id - 0x1b
+                    ###Multiply the encoder value to the enc_factor to get the angle to rotate for the encoder
+                    self.enc_data[index] = int(self.enc_factor[index] * self.decoded_encoder_value)
+                    self.enc_msg.data = self.enc_data
+                
+                    #self.decoded_encoder_value = int.from_bytes(data[0:1],"big", signed=True) 
+                    self.all_msgs.append(self.decoded_encoder_value)
+                    self.get_logger().info(f"Message Received = {self.decoded_encoder_value}")
+                    if msg:
+                        self.get_logger().info(f"Received message: {msg}")
+                        self.get_logger().info(f"Recieved value is {self.decoded_encoder_value}")
+                        self.enc_pub.publish(self.enc_msg)
             except can.CanError as e:
                 self.get_logger().info(f"Error receiving message: {e}")
 
@@ -131,12 +179,14 @@ class CAN_Class(Node):
                 with self.data_lock:
                     self.bus.send(self.msg)
                     #self.event.clear()
-                    self.get_logger().info("Message sent successfully:") 
+                    self.get_logger().info("Message sent successfully:")
                     #self.get_logger().info(self.msg.data)
                     msg_data = bytearray(self.msg.data)
-                    self.get_logger().info("Data sent is:", end = " ")
-                    for i in range(len(self.msg.data)):
-                        self.get_logger().info(msg_data[i], end= " ")
+                    print("msg_data ", msg_data)
+                    #self.get_logger().info("Data sent is:")
+                    #for i in range(len(self.msg.data)):
+                        #print("msg_data ", msg_data[i])
+                        #self.get_logger().info(int(msg_data[i]))
                     self.get_logger().info("")
             except can.CanError as e:
                 self.get_logger().info(f"Error sending message: {e}")
@@ -174,19 +224,20 @@ if __name__ == '__main__':
 
 
 
-    # def mainthread(self):
+# def mainthread(self):
 
-    #     rate = rospy.Rate(10)
-    #     try:
-    #         while not rospy.is_shutdown():
-    #             rospy.spin()
-    #     #except KeyboardInterrupt:
-    #     #    self.get_logger().info("Interrupted by user")
+#     rate = rospy.Rate(10)
+#     try:
+#         while not rospy.is_shutdown():
+#             rospy.spin()
+#     #except KeyboardInterrupt:
+#     #    self.get_logger().info("Interrupted by user")
 
 
-    
-    #     #    sys.exit(0)
-    #     finally:
-    #         sys.exit(0)
-    #         self.bus.shutdown()
-    #         self.get_logger().info("In finally block")
+
+#     #    sys.exit(0)
+#     finally:
+#         sys.exit(0)
+#         self.bus.shutdown()
+#         self.get_logger().info("In finally block")
+
