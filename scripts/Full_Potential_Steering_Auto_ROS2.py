@@ -5,7 +5,7 @@ from rclpy.node import Node
 import copy
 from sensor_msgs.msg import Joy, NavSatFix
 from std_msgs.msg import Int8, Int32MultiArray, Float32MultiArray
-# from std_msgs.msg import MultiArrayDimension, MultiArrayLayout
+from nav_msgs.msg import Twist
 import queue
 from operator import add
 from traversal2.msg import WheelRpm 
@@ -97,7 +97,7 @@ class Drive(Node):
         ##### Subscribers #####
         self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, self.qos)
         self.enc_sub = self.create_subscription(Float32MultiArray, "/enc_auto", self.enc_callback, self.qos)
-        self.rpm_sub = self.create_subscription(WheelRpm, "/motion", self.autonomous_callback, self.qos)
+        self.rpm_sub = self.create_subscription(Twist, "/motion", self.autonomous_callback, self.qos)
         self.rot_sub = self.create_subscription(Int8, "/rot", self.rotinplace_callback, self.qos)
         self.gps_sub = self.create_subscription(NavSatFix, "/gps_topic", self.gps_callback, self.qos)
         # Remember to change the GPS topic
@@ -206,12 +206,10 @@ class Drive(Node):
         self.get_logger().info(f"self.rotin: {self.rotin}")
 
 
-    def autonomous_callback(self, rpm: WheelRpm):
+    def autonomous_callback(self, msg: Twist):
         if self.state: 
-            self.autonomous_vel = rpm.vel
-            self.autonomous_omega = rpm.omega
-            self.crab_rotate = rpm.hb
-
+            self.autonomous_vel = msg.linear.x
+            self.autonomous_omega = msg.angular.z
     
     def autonomous_control(self):
         # Check first if the rover is in autonomous mode
@@ -584,12 +582,6 @@ class Drive(Node):
                     0,0,0,0
                 ]
                 
-            # PWM message initialisation
-            # self.pwm_msg.layout = MultiArrayLayout()
-            # self.pwm_msg.layout.data_offset = 0
-            # self.pwm_msg.layout.dim = [ MultiArrayDimension() ]
-            # self.pwm_msg.layout.dim[0].size = self.pwm_msg.layout.dim[0].stride = len(self.pwm_msg.data)
-            # self.pwm_msg.layout.dim[0].label = 'write'
             self.pwm_pub.publish(self.pwm_msg)
     
 
