@@ -506,10 +506,10 @@ class Drive(Node):
                     print("Rotating in place with velocity =", temp)
                     print("Enc_angles:- ", self.enc_data)
 
-                # else:
-                #     self.pwm_msg.data = [0,0,0,0,0,0,0,0]
-                #     if (self.print_ctrl == 0):    # Printing only at certain intervals, to prevent the screen from being filed with data
-                #         print("Steering is unlocked, lock it to perform drive.")
+                else:
+                    self.pwm_msg.data = [0,0,0,0,0,0,0,0]
+                    if (self.print_ctrl == 0):    # Printing only at certain intervals, to prevent the screen from being filed with data
+                        print("Steering is unlocked, lock it to perform drive.")
 
             case (True, False):
                 # In this case, full_potential_steering is unlocked, so all the wheels can be controlled individually
@@ -565,8 +565,8 @@ class Drive(Node):
                     print("Moving back right wheel.")
 
                 else:
-                    # self.pwm_msg.data = [0,0,0,0,0,0,0,0]
-                    # if (self.print_ctrl == 0):    # Printing only at certain intervals, to prevent the screen from being filed with data
+                    self.pwm_msg.data = [0,0,0,0,0,0,0,0]
+                    if (self.print_ctrl == 0):    # Printing only at certain intervals, to prevent the screen from being filed with data
                         print("Individual steering control mode unlocked, lock it to perform drive.")
 
         # At the end, steering is complete
