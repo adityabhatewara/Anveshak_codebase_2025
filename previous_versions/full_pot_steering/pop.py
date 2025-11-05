@@ -382,7 +382,7 @@ class Drive(Node):
                     self.start_time = time()
 
                     # Amount of curve needed multiplied with steering multiplier
-                    temp = int(self.s_arr[self.mode] * self.curve_opp_str)
+                    temp = int(30 * self.curve_opp_str)
 
                     # PWM message
                     # self.pwm_msg.data = [  
@@ -490,7 +490,7 @@ class Drive(Node):
                     print("Moving with rot in place velocities")
                     print()
 
-                    temp = int(85 * self.steering_ctrl_pwm[1])
+                    temp = int(self.max_steer_pwm * self.steering_ctrl_pwm[1])
                     # self.pwm_msg.data = [
                     #     0,0,0,0,
                     #     temp * self.init_dir[4],
