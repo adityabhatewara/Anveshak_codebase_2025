@@ -5,7 +5,7 @@ from rclpy.node import Node
 import copy
 from sensor_msgs.msg import Joy, NavSatFix
 from std_msgs.msg import Int8, Int32MultiArray, Float32MultiArray
-from nav_msgs.msg import Twist
+from geometry_msgs.msg import Twist
 import queue
 from operator import add
 from traversal2.msg import WheelRpm 
