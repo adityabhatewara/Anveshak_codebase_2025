@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import csv 
 import rclpy as r
 from rclpy.node import Node
 import copy
@@ -10,6 +10,9 @@ from operator import add
 from geometry_msgs.msg import Twist
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from time import time, sleep
+from sensor_msgs.msg import NavSatFix
+from nav_msgs.msg import Odometry
+import os
 
 class Drive(Node):
 
@@ -29,6 +32,8 @@ class Drive(Node):
         self.parallel_btn = 1                  # To turn all wheels perpendicular to chassis
         self.rotinplace_btn = 3                         
         self.autonomous_btn = 0                # Autonomous button switches between manual and autonomous
+
+        self.logging_button = 5                # CHANGE THIS BUTTON NUMBER
 
         self.steer_islocked = True             # Checks if the steering has been unlocked
         self.steering_ctrl_unlocked = [0, 0]   # Will store the buttons which control when the steering is unlocked
@@ -80,7 +85,28 @@ class Drive(Node):
         self.time_thresh = 10                     
         self.error_thresh = 2.0                   # Angle error threshold in deg
 
-        self.rotinplace = False                   # Condition if rover is in rotin place alignment    
+        self.rotinplace = False                   # Condition if rover is in rotin place alignment  
+
+        self.gps_lat = None
+        self.gps_long = None
+        self.gps_alt = None
+        self.current_x = None
+        self.current_y = None
+        self.orientation = None
+        self.gps_csv_file = "soham.csv"
+        self.odom_csv_file = "kavin.csv" 
+
+        if not os.path.isfile(self.gps_csv_file):
+            with open(self.gps_csv_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['latitude', 'longitude','altitude'])
+            self.get_logger().info(f'Created GPS CSV file: {self.gps_csv_file}')
+
+        if not os.path.isfile(self.odom_csv_file):
+            with open(self.odom_csv_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['odom_x', 'odom_y', 'orientation'])
+            self.get_logger().info(f'Created Odom CSV file: {self.odom_csv_file}')
 
         # PWM message initialisation
         self.pwm_msg = Int32MultiArray()
@@ -92,9 +118,10 @@ class Drive(Node):
         self.enc_sub = self.create_subscription(Float32MultiArray, "/enc_auto", self.enc_callback, self.qos)
         self.rpm_sub = self.create_subscription(Twist, "/motion", self.autonomous_callback, self.qos)
         self.rot_sub = self.create_subscription(Int8, "/rot", self.rotinplace_callback, self.qos)
+        self.gps_sub = self.create_subscription(NavSatFix, "/gps", self.gps_callback, self.qos)
+        self.odom_sub = self.create_subscription(Odometry, "/odom", self.odom_callback, self.qos)
 
         self.pwm_pub = self.create_publisher(Int32MultiArray, "/motor_pwm", self.qos)
-        # self.state_pub = self.create_publisher(Bool, "/state", self.qos)
 
         self.timer = self.create_timer(0.1, self.timer_callback)
 
@@ -104,12 +131,12 @@ class Drive(Node):
         if not self.state:   # The rover is in manual mode  
             
             # This is the correct version, just want to see if I can do some jugaad
-            if joy.buttons[self.mode_up_button]==1:
+            if joy.buttons[self.mode_up_button]:
                 sleep(1)
                 if self.mode < 4:
                     self.mode += 1
 
-            if joy.buttons[self.mode_down_button]==1:
+            if joy.buttons[self.mode_down_button]:
                 sleep(1)
                 if self.mode > 0:
                     self.mode -= 1
@@ -170,11 +197,20 @@ class Drive(Node):
         # Changing mode of operation
         if joy.buttons[self.autonomous_btn]: 
             self.state = not self.state
-            
+
+        if joy.buttons[self.logging_button]:
+            self.log_stuff()
+
+    
+    def odom_callback(self, odom: Odometry):
+        if odom is not None:
+            self.current_x = odom.pose.pose.position.x
+            self.current_y = odom.pose.pose.position.y  
+            self.orientation = odom.pose.pose.orientation.z
 
     def enc_callback(self, msg: Float32MultiArray):
         data = msg.data
-        self.get_logger().info(len(data))
+        self.get_logger().info(f"len(data)")
  
         self.enc_data[0] = data[1]   # Front Left
         self.enc_data[1] = -data[4]  # Front Right
@@ -196,7 +232,7 @@ class Drive(Node):
         # Check first if the rover is in autonomous mode
         if self.state:
             # Just check when to print
-            if self.print_ctrl==0:
+            if self.print_ctrl == 0:
                 self.get_logger().warn("Rover in autonomous mode. Press A to enter manual mode.")
 
             ## Wonder what this part does ##
@@ -218,7 +254,13 @@ class Drive(Node):
                         self.steering_ctrl_locked[0] = 1
                         self.state_init[1] = True
 
-                    
+    
+    def gps_callback(self, msg: NavSatFix):     
+        self.gps_lat = msg.latitude
+        self.gps_long = msg.longitude
+        self.gps_alt = msg.altitude
+        
+
     def steer(self, initial_angles, final_angles, mode):
         pwm = [0] * 4
         pwm_temp = [0] * 4
@@ -271,6 +313,18 @@ class Drive(Node):
         print("***Steering Complete***")
         print()
 
+    
+    def log_stuff(self):
+        with open(self.gps_csv_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([self.gps_lat, self.gps_long, self.gps_alt])
+            self.get_logger().info(f'GPS logged: gps_lat{self.gps_lat::.6f},gps_long={self.gps_long::.6f}')
+            
+        with open(self.odom_csv_file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([self.current_x, self.current_y, self.orientation])
+            self.get_logger().info(f'Odom logged: current_x={self.current_x:.3f}, current_y={self.current_y:.3f}, orientation={self.orientation}')
+       
 
     def steering(self):
         match (self.steer_islocked, self.full_potential_islocked):
@@ -321,15 +375,10 @@ class Drive(Node):
                     print("Encoder angles:-", self.enc_data, end = "       ") 
                     print("Mode =", self.mode, end = "      ")
                     print("Curving with steering")
-                    # self.pwm_pub.publish(self.pwm_msg)
-                    
-                    # print("2")
 
                 else:
                     self.pwm_msg.data = [0,0,0,0,0,0,0,0]
 
-                    
-        
             case (False, True):
                 # This is the case when the steering is unlocked
 
@@ -446,7 +495,7 @@ class Drive(Node):
                     print("Moving back right wheel.")
 
                 else:
-                    self.pwm_msg.data = [0,0,0,0,0,0,0,0]
+                    self.pwm_msg.data = [0] * 8
                     if (self.print_ctrl == 0):    # Printing only at certain intervals, to prevent the screen from being filed with data
                         self.get_logger().info("Individual steering control mode unlocked, lock it to perform drive.")
 
@@ -469,7 +518,7 @@ class Drive(Node):
                 if self.print_ctrl == 0:    
                     # Printing only at certain intervals, to prevent the screen from being filled with data   
                     # Print_ctrl is being incremented in main() every time
-                    print("Rotation speed =", int(vel))
+                    print(f"Rotation speed = {vel}")
                     
  
             else:  # Wheels are not aligned for rotin place
