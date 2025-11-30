@@ -31,10 +31,10 @@ def setup_ptz():
         media_profile = media.GetProfiles()[0]
         token = media_profile.token
         
-        print(f"✅ ONVIF Connected! Profile Token: {token}")
+        print(f"CAM Connected, Profile Token: {token}")
         return ptz, token
     except Exception as e:
-        print(f"❌ ONVIF Connection Failed: {e}")
+        print(f "Connection Failed (mostly IP error): {e}")
         return None, None
 
 def move(ptz, token, direction):
@@ -85,7 +85,7 @@ def main():
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     print("Controls: W/A/S/D to Move | SPACE to Stop | Q to Quit")
-    print("Click the video window to drive!")
+    print("You have to press stop each time to give the next command!")
 
     current_key = None
 
@@ -109,6 +109,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
