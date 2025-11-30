@@ -34,7 +34,7 @@ def setup_ptz():
         print(f"CAM Connected, Profile Token: {token}")
         return ptz, token
     except Exception as e:
-        print(f "Connection Failed (mostly IP error): {e}")
+        print(f"Connection Failed (mostly IP error): {e}")
         return None, None
 
 def move(ptz, token, direction):
@@ -109,6 +109,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
