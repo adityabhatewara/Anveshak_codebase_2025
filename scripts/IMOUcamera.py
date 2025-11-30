@@ -5,13 +5,13 @@ import cv2
 import threading
 
 # --- CONFIGURATION ---
-IP = "192.168.1.108"
-PORT = 80             # ONVIF uses Port 80
+IP = "10.42.0.69"   ## camera ip
+PORT = 80             # ONVIF (control commands) uses Port 80
 USER = "admin"
-PASS = "L26AF42F" # <--- REPLACE THIS
+PASS = "L26AF42F" # <--- put the security code
 
 # RTSP Stream (Use subtype=1 for Low Latency)
-RTSP_URL = f"rtsp://{USER}:{PASS}@{IP}:554/cam/realmonitor?channel=1&subtype=1"  ## put subtype = 0 for better queality (more latency)
+RTSP_URL = f"rtsp://{USER}:{PASS}@{IP}:554/cam/realmonitor?channel=1&subtype=1"  ## put subtype = 0 for better quality (more latency)
 
 # Global Variables
 ptz = None
@@ -109,6 +109,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
