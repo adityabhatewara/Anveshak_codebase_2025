@@ -1,3 +1,5 @@
+### you have to set your ip to static : 192.168.1.x ###
+
 from onvif import ONVIFCamera
 import cv2
 import threading
@@ -107,6 +109,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
